@@ -6,6 +6,7 @@ import { store, uid } from './store.js';
 import { mountTuner } from './tuner.js';
 
 let viewCleanup = null;
+const APP_VERSION = 7;
 
 const $app = document.getElementById('app');
 const STRUM_PRESETS = [
@@ -55,7 +56,7 @@ function chordsStrip(song) {
   const list = collectChords(song.text, song.transpose || 0);
   if (!list.length) return '';
   const inst = store.prefs.instrument || 'guitar';
-  return `<div class="strip">${list.map((c) => chordSVG(c, inst)).join('')}</div>`;
+  return `<div class="strip" data-chords="${esc(list.join('|'))}">${list.map((c) => chordSVG(c, inst)).join('')}</div>`;
 }
 
 export function cleanImport(raw) {
@@ -275,9 +276,29 @@ function toggleInst() {
   toast(`Acordes de ${INSTRUMENTS[next]}`);
 }
 
-function showChord(c) {
+// Atualiza na tela todos os diagramas e botões de instrumento, sem recarregar a página
+function refreshInstrument() {
   const inst = store.prefs.instrument || 'guitar';
-  modal(`<div class="chordbig">${chordSVG(c, inst)}</div>`, `Acorde · ${INSTRUMENTS[inst]}`);
+  document.querySelectorAll('.strip[data-chords]').forEach((el) => {
+    el.innerHTML = el.dataset.chords.split('|').map((c) => chordSVG(c, inst)).join('');
+  });
+  document.querySelectorAll('[data-a=inst]').forEach((b) => (b.outerHTML = instBtn()));
+}
+
+function showChord(c) {
+  const draw = () => {
+    const inst = store.prefs.instrument || 'guitar';
+    return `<div class="seg">${Object.entries(INSTRUMENTS).map(([k, n]) => `<button class="btn ${inst === k ? 'primary' : ''}" data-mi="${k}">${k === 'uke' ? '🪕' : '🎸'} ${n}</button>`).join('')}</div>
+      <div class="chordbig">${chordSVG(c, inst)}</div>`;
+  };
+  const el = modal(`<div id="mchord">${draw()}</div>`, `Acorde ${esc(c)}`);
+  el.addEventListener('click', (e) => {
+    const b = e.target.closest('[data-mi]');
+    if (!b) return;
+    store.savePrefs({ instrument: b.dataset.mi });
+    el.querySelector('#mchord').innerHTML = draw();
+    refreshInstrument();
+  });
 }
 
 function modal(html, title) {
@@ -614,7 +635,7 @@ function viewConfig() {
       <a class="btn primary" id="bm" href="#">🎸 Enviar para Minhas Cifras</a>
       <h3>Instalar no celular</h3>
       <p class="muted">No Chrome (Android): menu ⋮ → <b>Adicionar à tela inicial</b>. No Safari (iPhone): Compartilhar → <b>Adicionar à Tela de Início</b>. Funciona sem internet depois de aberto uma vez.</p>
-      <p class="muted small">${store.songs.length} músicas · ${store.sets.length} repertórios</p>
+      <p class="muted small">${store.songs.length} músicas · ${store.sets.length} repertórios · versão ${APP_VERSION}</p>
     </main>` + nav('cfg');
   $app.querySelector('#bm').setAttribute('href', bm);
   $app.querySelector('#bm').addEventListener('click', (e) => { e.preventDefault(); toast('Arraste este botão para a barra de favoritos'); });
