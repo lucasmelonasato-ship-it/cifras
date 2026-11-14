@@ -327,7 +327,7 @@ function viewEdit(id, preset) {
   $app.innerHTML = header(isNew ? 'Nova música' : 'Editar', isNew ? '#/' : `#/song/${song.id}`) + `
     <main class="wrap">
       <form class="form" id="f">
-        ${isNew ? `<div class="hint">Copie a cifra em qualquer site (Cifra Club, Cifras, etc.) e cole no campo <b>Cifra</b>. Acordes, seções, tom e capotraste são reconhecidos automaticamente.
+        ${isNew ? `<div class="hint"><span>Copie a cifra em qualquer site (Cifra Club, Cifras, etc.) e cole no campo <b>Cifra</b>. Acordes, seções, tom e capotraste são reconhecidos automaticamente.</span>
           <button type="button" class="btn" id="paste">📋 Colar da área de transferência</button></div>` : ''}
         <label>Música<input name="title" required value="${esc(song.title)}"></label>
         <label>Artista<input name="artist" value="${esc(song.artist)}"></label>
