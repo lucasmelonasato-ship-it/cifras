@@ -1,6 +1,6 @@
 import {
   isChordLine, isTabLine, layoutChordLine, transposeNote, firstChord, keyOf,
-  collectChords, chordSVG, esc, parseChord,
+  collectChords, chordSVG, esc, parseChord, INSTRUMENTS,
 } from './chords.js';
 import { store, uid } from './store.js';
 
@@ -50,7 +50,8 @@ function shownKey(song) {
 function chordsStrip(song) {
   const list = collectChords(song.text, song.transpose || 0);
   if (!list.length) return '';
-  return `<div class="strip">${list.map(chordSVG).join('')}</div>`;
+  const inst = store.prefs.instrument || 'guitar';
+  return `<div class="strip">${list.map((c) => chordSVG(c, inst)).join('')}</div>`;
 }
 
 export function cleanImport(raw) {
@@ -214,6 +215,7 @@ function viewSong(id) {
         <div class="toolbar">
           <div class="grp"><button data-a="tdown">−</button><span class="lbl">Tom <b>${esc(shownKey(song))}</b></span><button data-a="tup">+</button></div>
           <div class="grp"><button data-a="fdown">A−</button><button data-a="fup">A+</button></div>
+          ${instBtn()}
           <button data-a="diag" class="${store.prefs.showDiagrams ? 'on' : ''}">Acordes</button>
           <button data-a="addset">+ Repertório</button>
         </div>
@@ -238,6 +240,7 @@ function viewSong(id) {
     const y = window.scrollY;
     if (a === 'tup' || a === 'tdown') { store.patchSong(id, { transpose: ((song.transpose || 0) + (a === 'tup' ? 1 : -1)) % 12 }); draw(); window.scrollTo(0, y); }
     if (a === 'fup' || a === 'fdown') { store.savePrefs({ font: Math.max(10, Math.min(30, store.prefs.font + (a === 'fup' ? 1 : -1))) }); applyPrefs(); }
+    if (a === 'inst') { toggleInst(); draw(); window.scrollTo(0, y); }
     if (a === 'diag') { store.savePrefs({ showDiagrams: !store.prefs.showDiagrams }); draw(); window.scrollTo(0, y); }
     if (a === 'addset') addToSetModal([id]);
     if (a === 'play') scroller.toggle();
@@ -248,8 +251,20 @@ function viewSong(id) {
   };
 }
 
+function instBtn() {
+  const uke = store.prefs.instrument === 'uke';
+  return `<button data-a="inst" class="inst" title="Trocar instrumento">${uke ? '🪕 Ukulele' : '🎸 Violão'}</button>`;
+}
+
+function toggleInst() {
+  const next = store.prefs.instrument === 'uke' ? 'guitar' : 'uke';
+  store.savePrefs({ instrument: next, showDiagrams: true });
+  toast(`Acordes de ${INSTRUMENTS[next]}`);
+}
+
 function showChord(c) {
-  modal(`<div class="chordbig">${chordSVG(c)}</div>`, 'Acorde');
+  const inst = store.prefs.instrument || 'guitar';
+  modal(`<div class="chordbig">${chordSVG(c, inst)}</div>`, `Acorde · ${INSTRUMENTS[inst]}`);
 }
 
 function modal(html, title) {
@@ -457,12 +472,12 @@ function viewPlay(id) {
   $app.innerHTML = `
     <div class="stagebar top"><a class="btn ghost" href="#/set/${id}" aria-label="Sair">✕</a>
       <div class="now"><small id="pos">1/${songs.length}</small><b id="nowt">${esc(songs[0].title)}</b></div>
-      <div class="grp"><button data-a="fdown">A−</button><button data-a="fup">A+</button></div></div>
+      <div class="grp">${instBtn()}<button data-a="fdown">A−</button><button data-a="fup">A+</button></div></div>
     <main class="wrap stagewrap">${songs.map((s, i) => `
       <section class="stsong" data-i="${i}">
         <div class="sthead"><span class="n">${i + 1}</span><div><h2>${esc(s.title)}</h2><small>${esc(s.artist || '')} · Tom <b>${esc(shownKey(s))}</b>${s.capo ? ` · Capo ${s.capo}` : ''}</small></div></div>
         ${s.strum ? `<div class="strum"><span>Batida</span><b>${esc(s.strum)}</b></div>` : ''}
-        ${store.prefs.showDiagrams ? chordsStrip(s) : ''}
+        <div class="stripbox">${store.prefs.showDiagrams ? chordsStrip(s) : ''}</div>
         <article class="sheet">${renderSheet(s.text, s.transpose || 0)}</article>
       </section>`).join('')}
       <div class="fim">Fim do repertório 🎶</div><div class="endpad"></div>
@@ -516,6 +531,15 @@ function viewPlay(id) {
     const a = e.target.closest('[data-a]')?.dataset.a;
     if (!a) { if (e.target.closest('.stagewrap')) scroller.toggle(); return; }
     if (a === 'play') scroller.toggle();
+    if (a === 'inst') {
+      const offset = window.scrollY - secs[cur].offsetTop;
+      toggleInst();
+      $app.querySelector('.stagebar.top [data-a=inst]').outerHTML = instBtn();
+      $app.querySelectorAll('.stripbox').forEach((el, i) => (el.innerHTML = chordsStrip(songs[i])));
+      const top = secs[cur].offsetTop + offset;
+      scroller.acc = top;
+      window.scrollTo(0, top);
+    }
     if (a === 'prev') goto(cur - 1);
     if (a === 'next') goto(cur + 1);
     if (a === 'fup' || a === 'fdown') { store.savePrefs({ font: Math.max(10, Math.min(30, store.prefs.font + (a === 'fup' ? 1 : -1))) }); applyPrefs(); }
@@ -535,6 +559,9 @@ function viewConfig() {
     <main class="wrap form">
       <h3>Aparência</h3>
       <div class="grp"><button class="btn ${store.prefs.theme === 'dark' ? 'primary' : ''}" data-theme="dark">Escuro</button><button class="btn ${store.prefs.theme === 'light' ? 'primary' : ''}" data-theme="light">Claro</button></div>
+      <h3>Instrumento dos diagramas</h3>
+      <div class="grp">${Object.entries(INSTRUMENTS).map(([k, n]) => `<button class="btn ${(store.prefs.instrument || 'guitar') === k ? 'primary' : ''}" data-inst="${k}">${k === 'uke' ? '🪕' : '🎸'} ${n}</button>`).join('')}</div>
+      <p class="muted">Ukulele na afinação padrão G-C-E-A. A cifra é a mesma; só mudam os desenhos dos acordes.</p>
       <h3>Backup</h3>
       <p class="muted">Tudo fica salvo só neste aparelho. Exporte um backup para passar para outro celular/computador.</p>
       <div class="grp"><button class="btn" id="exp">⬇ Exportar backup</button><label class="btn">⬆ Importar backup<input type="file" id="imp" accept="application/json" hidden></label></div>
@@ -550,6 +577,8 @@ function viewConfig() {
   $app.onclick = (e) => {
     const t = e.target.closest('[data-theme]');
     if (t) { store.savePrefs({ theme: t.dataset.theme }); applyPrefs(); viewConfig(); }
+    const ib = e.target.closest('[data-inst]');
+    if (ib) { store.savePrefs({ instrument: ib.dataset.inst }); viewConfig(); }
     if (e.target.id === 'exp') {
       const blob = new Blob([store.exportAll()], { type: 'application/json' });
       const a = document.createElement('a');

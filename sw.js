@@ -1,5 +1,5 @@
 // Cache offline: o app funciona sem internet depois da primeira visita.
-const CACHE = 'cifras-v1';
+const CACHE = 'cifras-v2';
 const ASSETS = ['./', 'index.html', 'css/style.css', 'js/app.js', 'js/chords.js', 'js/store.js', 'js/seed.js',
   'manifest.webmanifest', 'icon.svg', 'icon-192.png', 'icon-512.png'];
 

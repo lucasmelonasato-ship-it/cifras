@@ -166,7 +166,7 @@ function fromString(s) {
   return s.split('').map((c) => (c === 'x' ? null : Number(c)));
 }
 
-export function chordShape(chord) {
+function guitarShape(chord) {
   const c = parseChord(chord);
   if (!c) return null;
   const q = quality(c.suffix);
@@ -191,9 +191,56 @@ export function chordShape(chord) {
   return { ...cands[0], bass: c.bass };
 }
 
-export function chordSVG(chord) {
-  const shape = chordShape(chord);
-  const W = 92, H = 112, left = 16, top = 26, gap = 12, fretH = 16, nFrets = 5;
+
+// ---------- Ukulele (afinação padrão G C E A, cordas 4 → 1) ----------
+// Formas abertas de referência por qualidade: [tônica, casas]. Qualquer outro tom é
+// obtido subindo a forma inteira no braço (pestana na casa k).
+const UKE_TEMPLATES = {
+  maj: [['C', '0003'], ['A', '2100'], ['G', '0232'], ['F', '2010'], ['D', '2220']],
+  m: [['A', '2000'], ['D', '2210'], ['G', '0231'], ['E', '0432'], ['C', '0333'], ['F#', '2120'], ['C#', '1104'], ['B', '4222']],
+  7: [['C', '0001'], ['A', '0100'], ['G', '0212'], ['D', '2223'], ['E', '1202']],
+  m7: [['A', '0000'], ['D', '2213'], ['G', '0211'], ['E', '0202']],
+  maj7: [['C', '0002'], ['A', '1100'], ['G', '0222'], ['F', '2410']],
+  sus4: [['C', '0013'], ['A', '2200'], ['D', '0230'], ['G', '0233']],
+  sus2: [['C', '0233'], ['D', '2200'], ['G', '0230']],
+  dim: [['C', '2323']],
+  dim7: [['C', '2323']],
+  m7b5: [['C', '3323'], ['A', '2333'], ['B', '2212']],
+  aug: [['C', '1003']],
+  6: [['C', '0000'], ['G', '0202']],
+  m6: [['C', '2333']],
+  add9: [['C', '0203']],
+  madd9: [['A', '2000']],
+  9: [['C', '0201']],
+  '7sus4': [['C', '0011'], ['G', '0213']],
+  mmaj7: [['C', '0332']],
+};
+
+function ukeShape(chord) {
+  const c = parseChord(chord);
+  if (!c) return null;
+  const q = quality(c.suffix);
+  const list = UKE_TEMPLATES[q] || UKE_TEMPLATES[q.startsWith('m') && q !== 'maj7' ? 'm' : 'maj'];
+  const r = NOTE_INDEX[c.root];
+  const cands = list.map(([root, str]) => {
+    const k = (((r - NOTE_INDEX[root]) % 12) + 12) % 12;
+    const frets = str.split('').map((f) => Number(f) + k);
+    return { frets, barre: k > 0 && str.includes('0') ? k : null, score: Math.max(...frets) * 100 + frets.reduce((a, f) => a + f, 0) };
+  });
+  cands.sort((a, b) => a.score - b.score);
+  return { ...cands[0], bass: c.bass };
+}
+
+export const INSTRUMENTS = { guitar: 'Violão', uke: 'Ukulele' };
+
+export function chordShape(chord, inst = 'guitar') {
+  return inst === 'uke' ? ukeShape(chord) : guitarShape(chord);
+}
+
+export function chordSVG(chord, inst = 'guitar') {
+  const shape = chordShape(chord, inst);
+  const N = inst === 'uke' ? 4 : 6;
+  const W = 92, H = 112, gap = inst === 'uke' ? 16 : 12, left = (W - gap * (N - 1)) / 2 - 4, top = 26, fretH = 16, nFrets = 5;
   if (!shape) {
     return `<svg viewBox="0 0 ${W} ${H}" class="diagram"><text x="${W / 2}" y="14" class="dg-name">${esc(chord)}</text><text x="${W / 2}" y="60" class="dg-small">sem diagrama</text></svg>`;
   }
@@ -201,18 +248,18 @@ export function chordSVG(chord) {
   const maxF = played.length ? Math.max(...played) : 0;
   const minF = played.length ? Math.min(...played) : 0;
   const base = maxF > nFrets ? minF : 1;
-  let s = `<svg viewBox="0 0 ${W} ${H}" class="diagram" role="img" aria-label="Acorde ${esc(chord)}">`;
+  let s = `<svg viewBox="0 0 ${W} ${H}" class="diagram" role="img" aria-label="Acorde ${esc(chord)} (${INSTRUMENTS[inst]})">`;
   s += `<text x="${W / 2}" y="12" class="dg-name">${esc(chord)}</text>`;
   // trastes
   for (let i = 0; i <= nFrets; i++) {
     const y = top + i * fretH;
-    s += `<line x1="${left}" y1="${y}" x2="${left + gap * 5}" y2="${y}" class="${i === 0 && base === 1 ? 'dg-nut' : 'dg-line'}"/>`;
+    s += `<line x1="${left}" y1="${y}" x2="${left + gap * (N - 1)}" y2="${y}" class="${i === 0 && base === 1 ? 'dg-nut' : 'dg-line'}"/>`;
   }
-  for (let i = 0; i < 6; i++) {
+  for (let i = 0; i < N; i++) {
     const x = left + i * gap;
     s += `<line x1="${x}" y1="${top}" x2="${x}" y2="${top + nFrets * fretH}" class="dg-line"/>`;
   }
-  if (base > 1) s += `<text x="${left + gap * 5 + 5}" y="${top + fretH * 0.7}" class="dg-fret">${base}</text>`;
+  if (base > 1) s += `<text x="${left + gap * (N - 1) + 5}" y="${top + fretH * 0.7}" class="dg-fret">${base}</text>`;
   // pestana
   let barreDrawn = null;
   if (shape.barre) {
