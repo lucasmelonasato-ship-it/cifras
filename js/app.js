@@ -1,5 +1,5 @@
 import {
-  isChordLine, isTabLine, layoutChordLine, transposeNote, firstChord, keyOf,
+  isChordLine, isTabLine, stripTabs, hasTabs, layoutChordLine, transposeNote, firstChord, keyOf,
   collectChords, chordSVG, esc, parseChord, INSTRUMENTS,
 } from './chords.js';
 import { store, uid } from './store.js';
@@ -32,7 +32,8 @@ function renderLine(line, semis) {
   return `<div class="ln">${esc(line)}</div>`;
 }
 
-export function renderSheet(text, semis = 0) {
+export function renderSheet(text, semis = 0, showTabs = true) {
+  if (!showTabs) text = stripTabs(text).text;
   return text.split('\n').map((line) => {
     const sec = /^\s*\[([^\]]+)\]\s*(.*)$/.exec(line);
     if (sec) {
@@ -222,11 +223,12 @@ function viewSong(id) {
           <div class="grp"><button data-a="fdown">A−</button><button data-a="fup">A+</button></div>
           ${instBtn()}
           <button data-a="diag" class="${store.prefs.showDiagrams ? 'on' : ''}">Acordes</button>
+          ${tabBtn(song)}
           <button data-a="addset">+ Repertório</button>
         </div>
         ${song.strum ? `<div class="strum"><span>Batida</span><b>${esc(song.strum)}</b></div>` : ''}
         ${store.prefs.showDiagrams ? chordsStrip(song) : ''}
-        <article class="sheet">${renderSheet(song.text, song.transpose || 0)}</article>
+        <article class="sheet">${renderSheet(song.text, song.transpose || 0, !!song.showTabs)}</article>
         <div class="endpad"></div>
       </main>
       <div class="playbar">
@@ -246,6 +248,7 @@ function viewSong(id) {
     if (a === 'tup' || a === 'tdown') { store.patchSong(id, { transpose: ((song.transpose || 0) + (a === 'tup' ? 1 : -1)) % 12 }); draw(); window.scrollTo(0, y); }
     if (a === 'fup' || a === 'fdown') { store.savePrefs({ font: Math.max(10, Math.min(30, store.prefs.font + (a === 'fup' ? 1 : -1))) }); applyPrefs(); }
     if (a === 'inst') { toggleInst(); draw(); window.scrollTo(0, y); }
+    if (a === 'tabs') { store.patchSong(id, { showTabs: !song.showTabs }); draw(); window.scrollTo(0, y); }
     if (a === 'diag') { store.savePrefs({ showDiagrams: !store.prefs.showDiagrams }); draw(); window.scrollTo(0, y); }
     if (a === 'addset') addToSetModal([id]);
     if (a === 'play') scroller.toggle();
@@ -254,6 +257,11 @@ function viewSong(id) {
       $app.querySelector('#spd').textContent = song.speed;
     }
   };
+}
+
+function tabBtn(song, i) {
+  if (!hasTabs(song.text)) return '';
+  return `<button data-a="tabs" ${i !== undefined ? `data-i="${i}"` : ''} class="tabbtn ${song.showTabs ? 'on' : ''}" title="Mostrar ou esconder tablaturas (dedilhado/solo)">🎼 Tab: ${song.showTabs ? 'mostrando' : 'escondida'}</button>`;
 }
 
 function instBtn() {
@@ -335,6 +343,8 @@ function viewEdit(id, preset) {
           <select id="preset"><option value="">Padrões prontos…</option>${STRUM_PRESETS.map(([n, p]) => `<option value="${esc(p)}">${esc(n)}: ${esc(p)}</option>`).join('')}</select>
         </div>
         <label>Cifra<textarea name="text" rows="14" spellcheck="false" placeholder="[Intro] G  D  Em  C&#10;&#10;G              D&#10;Letra da música aqui...">${esc(song.text)}</textarea></label>
+        <div class="tabinfo" id="tabinfo" hidden>🎼 <span>Tablatura detectada (dedilhado/solo). Ela fica <b>escondida</b> na música; para ver, use o botão <b>Tab</b>.</span>
+          <button type="button" class="btn sm" id="striptabs">Apagar tablaturas de vez</button></div>
         <div class="actions">
           <button class="btn primary">Salvar</button>
           ${isNew ? '' : '<button type="button" class="btn danger" id="del">Excluir</button>'}
@@ -345,7 +355,10 @@ function viewEdit(id, preset) {
     </main>`;
   const f = $app.querySelector('#f');
   const pv = $app.querySelector('#pv');
-  const upd = () => (pv.innerHTML = renderSheet(f.text.value));
+  const upd = () => {
+    pv.innerHTML = renderSheet(f.text.value);
+    $app.querySelector('#tabinfo').hidden = !hasTabs(f.text.value);
+  };
   upd();
   const ingest = (raw) => {
     const r = cleanImport(raw);
@@ -367,6 +380,12 @@ function viewEdit(id, preset) {
     if (!k) return;
     const v = f.strum.value;
     f.strum.value = k === '⌫' ? v.slice(0, -1).trimEnd() : (v + (k === '␣' ? ' ' : (v && !v.endsWith(' ') && k !== '↑' ? ' ' : '') + k));
+  });
+  $app.querySelector('#striptabs').addEventListener('click', () => {
+    const r = stripTabs(f.text.value);
+    f.text.value = r.text;
+    upd();
+    toast(`${r.removed} linhas de tablatura removidas`);
   });
   $app.querySelector('#preset').addEventListener('change', (e) => { if (e.target.value) f.strum.value = e.target.value; });
   $app.querySelector('#del')?.addEventListener('click', () => {
@@ -480,10 +499,10 @@ function viewPlay(id) {
       <div class="grp">${instBtn()}<button data-a="fdown">A−</button><button data-a="fup">A+</button></div></div>
     <main class="wrap stagewrap">${songs.map((s, i) => `
       <section class="stsong" data-i="${i}">
-        <div class="sthead"><span class="n">${i + 1}</span><div><h2>${esc(s.title)}</h2><small>${esc(s.artist || '')} · Tom <b>${esc(shownKey(s))}</b>${s.capo ? ` · Capo ${s.capo}` : ''}</small></div></div>
+        <div class="sthead"><span class="n">${i + 1}</span><div><h2>${esc(s.title)}</h2><small>${esc(s.artist || '')} · Tom <b>${esc(shownKey(s))}</b>${s.capo ? ` · Capo ${s.capo}` : ''}</small><div class="tabslot">${tabBtn(s, i)}</div></div></div>
         ${s.strum ? `<div class="strum"><span>Batida</span><b>${esc(s.strum)}</b></div>` : ''}
         <div class="stripbox">${store.prefs.showDiagrams ? chordsStrip(s) : ''}</div>
-        <article class="sheet">${renderSheet(s.text, s.transpose || 0)}</article>
+        <article class="sheet">${renderSheet(s.text, s.transpose || 0, !!s.showTabs)}</article>
       </section>`).join('')}
       <div class="fim">Fim do repertório 🎶</div><div class="endpad"></div>
     </main>
@@ -541,6 +560,17 @@ function viewPlay(id) {
       toggleInst();
       $app.querySelector('.stagebar.top [data-a=inst]').outerHTML = instBtn();
       $app.querySelectorAll('.stripbox').forEach((el, i) => (el.innerHTML = chordsStrip(songs[i])));
+      const top = secs[cur].offsetTop + offset;
+      scroller.acc = top;
+      window.scrollTo(0, top);
+    }
+    if (a === 'tabs') {
+      const i = Number(e.target.closest('[data-a]').dataset.i);
+      const s = songs[i];
+      const offset = window.scrollY - secs[cur].offsetTop;
+      store.patchSong(s.id, { showTabs: !s.showTabs });
+      secs[i].querySelector('.tabslot').innerHTML = tabBtn(s, i);
+      secs[i].querySelector('.sheet').innerHTML = renderSheet(s.text, s.transpose || 0, !!s.showTabs);
       const top = secs[cur].offsetTop + offset;
       scroller.acc = top;
       window.scrollTo(0, top);

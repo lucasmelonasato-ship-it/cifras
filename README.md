@@ -4,6 +4,7 @@ App pessoal de cifras para violão. Sem anúncios, sem login, funciona offline e
 
 ## O que faz
 - **Biblioteca de músicas**: cole a cifra copiada de qualquer site. O app reconhece acordes, seções (`[Intro]`, `[Refrão]`), tablaturas, tom e capotraste.
+- **Tablaturas sob controle**: dedilhados e solos colados junto com a cifra são reconhecidos sozinhos. Ficam escondidos por padrão, aparecem com o botão 🎼 Tab (por música, inclusive no repertório) e podem ser apagados de vez no editor.
 - **Transposição** de tom (− / +), que fica salva por música.
 - **Diagramas de acordes para violão ou ukulele**: um toque no botão 🎸/🪕 troca o instrumento, inclusive no meio do repertório. O ukulele usa a afinação padrão G-C-E-A. Toque em qualquer acorde para ampliar o desenho.
 - **Batida/ritmo** por música, com teclado de setas e padrões prontos.

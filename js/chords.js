@@ -39,7 +39,41 @@ export function isChordLine(line) {
 }
 
 export function isTabLine(line) {
-  return /^\s*[EADGBe]\s*[|:].*-/.test(line) || /^\s*\|?-{3,}.*\|/.test(line);
+  const t = line.trim();
+  if ((t.match(/-/g) || []).length < 3) return false;
+  return /^[A-Ga-g][#b]?\s*[|:]/.test(t)            // E|---3---|  (violão/ukulele)
+    || /^\|?-{2,}.*[|\d-]$/.test(t)                  // |---3---|
+    || /^[A-Ga-g]\s*-{2,}[\d\-hpbr/\\~x()|]*$/.test(t); // E----3----
+}
+
+const TAB_PART = /^\s*parte\s+\d+\s+de\s+\d+\s*$/i;
+
+// Remove tablaturas (dedilhados/solos): seções "[Tab - …]", linhas de tablatura e
+// marcadores "Parte 1 de 2". Retorna o texto limpo e quantas linhas saíram.
+export function stripTabs(text) {
+  const out = [];
+  let inTab = false, removed = 0;
+  for (const line of text.split('\n')) {
+    const hdr = /^\s*\[([^\]]+)\]/.exec(line);
+    if (hdr) {
+      inTab = /\btab\b/i.test(hdr[1]);
+      if (inTab) { removed++; continue; }
+      out.push(line);
+      continue;
+    }
+    if (isTabLine(line) || TAB_PART.test(line)) { removed++; continue; }
+    if (inTab) {
+      // dentro de um bloco de tab: some com linhas vazias e acordes de apoio; letra encerra o bloco
+      if (!line.trim() || isChordLine(line)) { if (line.trim()) removed++; continue; }
+      inTab = false;
+    }
+    out.push(line);
+  }
+  return { text: out.join('\n').replace(/\n{3,}/g, '\n\n').replace(/^\n+/, ''), removed };
+}
+
+export function hasTabs(text) {
+  return stripTabs(text || '').removed > 0;
 }
 
 export function noteName(i) {
