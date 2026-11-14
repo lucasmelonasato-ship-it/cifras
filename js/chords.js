@@ -178,7 +178,8 @@ const E_SHAPES = {
   maj7: [0, 2, 1, 1, 0, 0], sus4: [0, 2, 2, 2, 0, 0], '7sus4': [0, 2, 0, 2, 0, 0],
   6: [0, 2, 2, 1, 2, 0], m6: [0, 2, 2, 0, 2, 0], aug: [0, 3, 2, 1, 1, 0],
   m7b5: [0, null, 0, 0, -1, null], dim7: [0, null, -1, 0, -1, null],
-  mmaj7: [0, 2, 1, 0, 0, 0], madd9: [0, 2, 4, 0, 0, 0],
+  mmaj7: [0, 2, 1, 0, 0, 0], madd9: [0, 2, 4, 0, 0, 0], 9: [0, 2, 0, 1, 0, 2],
+  sus2: [0, 2, 4, 4, 0, 0], dim: [0, 1, 2, 0, null, null], add9: [0, 2, 4, 1, 0, 0],
 };
 const A_SHAPES = {
   maj: [null, 0, 2, 2, 2, 0], m: [null, 0, 2, 2, 1, 0], 7: [null, 0, 2, 0, 2, 0], m7: [null, 0, 2, 0, 1, 0],
@@ -191,7 +192,7 @@ const A_SHAPES = {
 const OPEN = {
   'C:maj': 'x32010', 'C:7': 'x32310', 'C:maj7': 'x32000', 'C:add9': 'x32030', 'C:6': 'x32210',
   'D:maj': 'xx0232', 'D:m': 'xx0231', 'D:7': 'xx0212', 'D:m7': 'xx0211', 'D:maj7': 'xx0222',
-  'D:sus4': 'xx0233', 'D:sus2': 'xx0230', 'D:add9': 'xx0230', 'D:7sus4': 'xx0213',
+  'D:sus4': 'xx0233', 'D:sus2': 'xx0230', 'D:add9': 'x54230', 'D:7sus4': 'xx0213',
   'G:maj': '320003', 'G:7': '320001', 'G:maj7': '320002', 'G:6': '320000', 'G:add9': '320203',
   'E:add9': '024100', 'B:7': 'x21202', 'F:maj7': 'xx3210',
 };
@@ -213,10 +214,13 @@ function guitarShape(chord) {
   const add = (shapes, base) => {
     const sh = shapes[qq];
     if (!sh) return;
-    const f = (((r - base) % 12) + 12) % 12;
-    const frets = sh.map((o) => (o === null ? null : f + o));
-    if (frets.some((x) => x !== null && x < 0)) return;
-    cands.push({ frets, barre: f > 0 ? f : null, score: f });
+    let f = (((r - base) % 12) + 12) % 12;
+    let frets = sh.map((o) => (o === null ? null : f + o));
+    if (frets.some((x) => x !== null && x < 0)) { // forma não cabe perto da pestana: usa uma oitava acima
+      f += 12;
+      frets = sh.map((o) => (o === null ? null : f + o));
+    }
+    cands.push({ frets, barre: f > 0 && sh.filter((o) => o === 0).length >= 2 ? f : null, score: f });
   };
   add(E_SHAPES, 4);
   add(A_SHAPES, 9);
@@ -237,17 +241,17 @@ const UKE_TEMPLATES = {
   maj7: [['C', '0002'], ['A', '1100'], ['G', '0222'], ['F', '2410']],
   sus4: [['C', '0013'], ['A', '2200'], ['D', '0230'], ['G', '0233']],
   sus2: [['C', '0233'], ['D', '2200'], ['G', '0230']],
-  dim: [['C', '2323']],
-  dim7: [['C', '2323']],
+  dim: [['C', '2323'], ['G', '0101']],
+  dim7: [['C', '2323'], ['G', '0101']],
   m7b5: [['C', '3323'], ['A', '2333'], ['B', '2212']],
-  aug: [['C', '1003']],
+  aug: [['C', '1003'], ['E', '1003'], ['G#', '1003'], ['A', '2110']],
   6: [['C', '0000'], ['G', '0202']],
-  m6: [['C', '2333']],
-  add9: [['C', '0203']],
-  madd9: [['A', '2000']],
-  9: [['C', '0201']],
+  m6: [['C', '2333'], ['A', '2423']],
+  add9: [['C', '0203'], ['G', '0252'], ['F', '0010']],
+  madd9: [['A', '2002'], ['E', '0422']],
+  9: [['C', '0201'], ['G', '2212']],
   '7sus4': [['C', '0011'], ['G', '0213']],
-  mmaj7: [['C', '0332']],
+  mmaj7: [['C', '0332'], ['A', '1000']],
 };
 
 function ukeShape(chord) {
@@ -256,11 +260,16 @@ function ukeShape(chord) {
   const q = quality(c.suffix);
   const list = UKE_TEMPLATES[q] || UKE_TEMPLATES[q.startsWith('m') && q !== 'maj7' ? 'm' : 'maj'];
   const r = NOTE_INDEX[c.root];
-  const cands = list.map(([root, str]) => {
-    const k = (((r - NOTE_INDEX[root]) % 12) + 12) % 12;
-    const frets = str.split('').map((f) => Number(f) + k);
-    return { frets, barre: k > 0 && str.includes('0') ? k : null, score: Math.max(...frets) * 100 + frets.reduce((a, f) => a + f, 0) };
-  });
+  const cands = [];
+  for (const [root, str] of list) {
+    const base = str.split('').map(Number);
+    const k0 = (((r - NOTE_INDEX[root]) % 12) + 12) % 12;
+    for (const k of [k0, k0 - 12]) { // também tenta descer a forma uma oitava, se couber no braço
+      const frets = base.map((f) => f + k);
+      if (frets.some((f) => f < 0)) continue;
+      cands.push({ frets, barre: k > 0 && str.includes('0') ? k : null, score: Math.max(...frets) * 100 + frets.reduce((a, f) => a + f, 0) });
+    }
+  }
   cands.sort((a, b) => a.score - b.score);
   return { ...cands[0], bass: c.bass };
 }
@@ -318,3 +327,17 @@ export function chordSVG(chord, inst = 'guitar') {
 export function esc(s) {
   return String(s).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 }
+
+// Tipos de acorde do dicionário: [sufixo na notação brasileira, nome por extenso]
+export const CHORD_TYPES = [
+  ['', 'maior'], ['m', 'menor'], ['7', 'com sétima'], ['m7', 'menor com sétima'],
+  ['7M', 'com sétima maior'], ['9', 'com nona (add9)'], ['m(9)', 'menor com nona'],
+  ['7(9)', 'sétima e nona'], ['6', 'com sexta'], ['m6', 'menor com sexta'],
+  ['sus2', 'suspenso 2ª'], ['sus4', 'suspenso 4ª'], ['7(4)', 'sétima suspenso 4ª'],
+  ['m(7M)', 'menor com sétima maior'], ['°', 'diminuto'], ['°7', 'diminuto com sétima'],
+  ['m7(b5)', 'meio-diminuto'], ['+', 'aumentado'],
+];
+export const ROOTS = [
+  ['C', 'Dó'], ['C#', 'Dó#'], ['D', 'Ré'], ['Eb', 'Mib'], ['E', 'Mi'], ['F', 'Fá'],
+  ['F#', 'Fá#'], ['G', 'Sol'], ['G#', 'Sol#'], ['A', 'Lá'], ['Bb', 'Sib'], ['B', 'Si'],
+];

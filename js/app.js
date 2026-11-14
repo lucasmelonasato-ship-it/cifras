@@ -1,12 +1,12 @@
 import {
   isChordLine, isTabLine, stripTabs, hasTabs, layoutChordLine, transposeNote, firstChord, keyOf,
-  collectChords, chordSVG, esc, parseChord, INSTRUMENTS,
+  collectChords, chordSVG, esc, parseChord, INSTRUMENTS, CHORD_TYPES, ROOTS,
 } from './chords.js';
 import { store, uid } from './store.js';
 import { mountTuner } from './tuner.js';
 
 let viewCleanup = null;
-const APP_VERSION = 7;
+const APP_VERSION = 8;
 
 const $app = document.getElementById('app');
 const STRUM_PRESETS = [
@@ -146,6 +146,7 @@ const routes = [
   [/^#\/play\/(.+)$/, viewPlay],
   [/^#\/config$/, viewConfig],
   [/^#\/tuner$/, viewTuner],
+  [/^#\/chords$/, viewChords],
 ];
 
 function render() {
@@ -178,7 +179,7 @@ function header(title, back, extra = '') {
 
 function nav(active) {
   const item = (href, label, icon, key) => `<a href="${href}" class="${active === key ? 'on' : ''}"><span>${icon}</span>${label}</a>`;
-  return `<nav class="tabs">${item('#/', 'Músicas', '♫', 'lib')}${item('#/sets', 'Repertórios', '☰', 'sets')}${item('#/tuner', 'Afinador', '◎', 'tun')}${item('#/config', 'Ajustes', '⚙', 'cfg')}</nav>`;
+  return `<nav class="tabs">${item('#/', 'Músicas', '♫', 'lib')}${item('#/sets', 'Repertórios', '☰', 'sets')}${item('#/chords', 'Acordes', '▦', 'chd')}${item('#/tuner', 'Afinador', '◎', 'tun')}${item('#/config', 'Ajustes', '⚙', 'cfg')}</nav>`;
 }
 
 function norm(s) { return (s || '').normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase(); }
@@ -604,6 +605,43 @@ function viewPlay(id) {
       store.patchSong(s.id, { speed: Math.max(2, Math.min(120, (s.speed || 20) + (a === 'sup' ? 2 : -2))) });
       $app.querySelector('#spd').textContent = s.speed;
     }
+  };
+}
+
+// Dicionário de acordes
+function viewChords() {
+  let root = sessionStorage.getItem('root') || 'C';
+  const draw = () => {
+    const inst = store.prefs.instrument || 'guitar';
+    const sol = ROOTS.find(([r]) => r === root)[1];
+    $app.innerHTML = header('Acordes', null) + `
+      <main class="wrap dict">
+        <div class="seg">${Object.entries(INSTRUMENTS).map(([k, n]) => `<button class="btn ${inst === k ? 'primary' : ''}" data-mi="${k}">${k === 'uke' ? '🪕' : '🎸'} ${n}</button>`).join('')}</div>
+        <input class="search" id="cq" type="search" autocomplete="off" autocapitalize="characters" placeholder="Procurar acorde (ex: F#m7, Bb, G7M)…">
+        <div id="cres"></div>
+        <h3>Escolha a nota</h3>
+        <div class="roots">${ROOTS.map(([r, n]) => `<button class="${r === root ? 'on' : ''}" data-r="${r}"><b>${r}</b><small>${n}</small></button>`).join('')}</div>
+        <h3>Acordes de ${root} (${sol})</h3>
+        <div class="cgrid">${CHORD_TYPES.map(([suf, nome]) => `
+          <button class="ccell" data-c="${esc(root + suf)}">${chordSVG(root + suf, inst)}<small>${esc(nome)}</small></button>`).join('')}</div>
+        <p class="muted small">Toque em um acorde para ampliar. Na notação brasileira, “9” é o acorde com nona adicionada (add9) e “7M” é a sétima maior.</p>
+      </main>` + nav('chd');
+    const q = $app.querySelector('#cq');
+    const res = $app.querySelector('#cres');
+    q.addEventListener('input', () => {
+      const v = q.value.trim().replace(/^([a-g])/, (m) => m.toUpperCase());
+      res.innerHTML = v && parseChord(v) ? `<button class="ccell bigc" data-c="${esc(v)}">${chordSVG(v, inst)}</button>`
+        : v ? '<p class="muted">Acorde não reconhecido. Exemplos: C, Am, G7, F#m7, Bb7M, D4, E7(9), Bm7(b5).</p>' : '';
+    });
+  };
+  draw();
+  $app.onclick = (e) => {
+    const r = e.target.closest('[data-r]');
+    if (r) { root = r.dataset.r; sessionStorage.setItem('root', root); const y = window.scrollY; draw(); window.scrollTo(0, y); return; }
+    const mi = e.target.closest('[data-mi]');
+    if (mi) { store.savePrefs({ instrument: mi.dataset.mi }); const y = window.scrollY; draw(); window.scrollTo(0, y); return; }
+    const c = e.target.closest('[data-c]');
+    if (c) showChord(c.dataset.c);
   };
 }
 

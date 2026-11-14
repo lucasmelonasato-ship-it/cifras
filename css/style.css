@@ -184,3 +184,19 @@ h3 small { text-transform: none; letter-spacing: 0; font-weight: 400; }
 
 .seg { display: flex; gap: 8px; margin: 6px 0 4px; }
 .seg .btn { flex: 1; }
+
+/* Dicionário de acordes */
+.dict .seg { margin-bottom: 12px; }
+.roots { display: grid; grid-template-columns: repeat(6, 1fr); gap: 6px; }
+.roots button { display: flex; flex-direction: column; align-items: center; padding: 7px 0; border-radius: 10px; border: 1px solid var(--line); background: var(--surface); }
+.roots button b { font-size: 17px; }
+.roots button small { font-size: 10px; color: var(--muted); }
+.roots button.on { background: var(--accent); border-color: var(--accent); color: var(--accent-ink); }
+.roots button.on small { color: var(--accent-ink); }
+.cgrid { display: grid; grid-template-columns: repeat(auto-fill, minmax(96px, 1fr)); gap: 8px; }
+.ccell { display: flex; flex-direction: column; align-items: center; gap: 2px; padding: 4px 2px 8px; border-radius: 12px; border: 1px solid var(--line); background: var(--surface); }
+.ccell .diagram { width: 84px; background: none; }
+.ccell small { font-size: 11px; color: var(--muted); text-align: center; line-height: 1.2; }
+.ccell.bigc { width: 160px; margin: 0 auto 6px; }
+.ccell.bigc .diagram { width: 150px; }
+.tabs a { font-size: 11px; }
