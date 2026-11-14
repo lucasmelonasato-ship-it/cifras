@@ -3,6 +3,9 @@ import {
   collectChords, chordSVG, esc, parseChord, INSTRUMENTS,
 } from './chords.js';
 import { store, uid } from './store.js';
+import { mountTuner } from './tuner.js';
+
+let viewCleanup = null;
 
 const $app = document.getElementById('app');
 const STRUM_PRESETS = [
@@ -140,9 +143,11 @@ const routes = [
   [/^#\/set\/(.+)$/, viewSet],
   [/^#\/play\/(.+)$/, viewPlay],
   [/^#\/config$/, viewConfig],
+  [/^#\/tuner$/, viewTuner],
 ];
 
 function render() {
+  if (viewCleanup) { viewCleanup(); viewCleanup = null; }
   scroller.stop();
   scroller.onTick = () => {};
   scroller.onState = () => {};
@@ -171,7 +176,7 @@ function header(title, back, extra = '') {
 
 function nav(active) {
   const item = (href, label, icon, key) => `<a href="${href}" class="${active === key ? 'on' : ''}"><span>${icon}</span>${label}</a>`;
-  return `<nav class="tabs">${item('#/', 'Músicas', '♫', 'lib')}${item('#/sets', 'Repertórios', '☰', 'sets')}${item('#/config', 'Ajustes', '⚙', 'cfg')}</nav>`;
+  return `<nav class="tabs">${item('#/', 'Músicas', '♫', 'lib')}${item('#/sets', 'Repertórios', '☰', 'sets')}${item('#/tuner', 'Afinador', '◎', 'tun')}${item('#/config', 'Ajustes', '⚙', 'cfg')}</nav>`;
 }
 
 function norm(s) { return (s || '').normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase(); }
@@ -549,6 +554,15 @@ function viewPlay(id) {
       $app.querySelector('#spd').textContent = s.speed;
     }
   };
+}
+
+// Afinador
+function viewTuner() {
+  $app.innerHTML = header('Afinador', null) + '<main class="wrap" id="tunerRoot"></main>' + nav('tun');
+  viewCleanup = mountTuner($app.querySelector('#tunerRoot'), {
+    getInst: () => store.prefs.instrument || 'guitar',
+    setInst: (i) => store.savePrefs({ instrument: i }),
+  });
 }
 
 // Ajustes

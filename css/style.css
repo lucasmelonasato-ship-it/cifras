@@ -146,3 +146,33 @@ h3 { font-size: 14px; text-transform: uppercase; letter-spacing: .06em; color: v
 
 .inst { border-color: var(--accent) !important; color: var(--accent); }
 .stagebar .inst { padding: 0 8px; font-size: 13px; }
+
+/* Afinador */
+.tuner { display: flex; flex-direction: column; gap: 14px; }
+.tinst { display: flex; gap: 8px; }
+.tinst .btn { flex: 1; }
+.tdial { background: var(--surface); border: 2px solid var(--line); border-radius: 18px; padding: 18px 16px 14px; text-align: center; transition: border-color .2s; }
+.tdial.ok { border-color: #22c55e; }
+.tnote { display: flex; flex-direction: column; align-items: center; }
+.tnote span { font-size: 72px; font-weight: 800; line-height: 1; color: var(--chord); }
+.tdial.ok .tnote span { color: #22c55e; }
+.tnote small { color: var(--muted); margin-top: 4px; min-height: 1.2em; }
+.tmeter { position: relative; height: 46px; margin: 16px 6px 8px; }
+.tscale { position: absolute; inset: 0; display: flex; justify-content: space-between; align-items: center; }
+.tscale i { width: 2px; height: 14px; background: var(--line); }
+.tscale i.mid { height: 30px; background: #22c55e; width: 3px; }
+.tneedle { --x: 0; position: absolute; top: 2px; bottom: 2px; left: 50%; width: 4px; margin-left: -2px; border-radius: 2px; background: var(--text);
+  transform: translateX(calc(var(--x) * (min(100vw, 860px) / 2 - 56px))); transition: transform .12s linear; }
+.tdial.ok .tneedle { background: #22c55e; }
+.tread { display: flex; justify-content: space-between; color: var(--muted); font-size: 14px; font-family: var(--mono); }
+.thint { margin-top: 10px; font-weight: 600; min-height: 1.3em; }
+.tdial.ok .thint { color: #22c55e; }
+.tstart { min-height: 50px; font-size: 17px; }
+.tstrings { display: grid; grid-template-columns: repeat(auto-fit, minmax(84px, 1fr)); gap: 8px; }
+.tstr { display: flex; flex-direction: column; align-items: center; padding: 10px 4px; border-radius: 12px; border: 2px solid var(--line); background: var(--surface); }
+.tstr b { font-size: 24px; }
+.tstr small { color: var(--muted); font-size: 11px; }
+.tstr.hit { border-color: var(--chord); }
+.tstr.sel { background: var(--accent); border-color: var(--accent); color: var(--accent-ink); }
+.tstr.sel small { color: var(--accent-ink); }
+h3 small { text-transform: none; letter-spacing: 0; font-weight: 400; }
